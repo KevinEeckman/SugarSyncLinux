@@ -1,6 +1,7 @@
 __author__ = 'kevin'
 import requests
 import xml.etree.ElementTree as ET
+import datetime
 import dateutil.parser
 
 
@@ -50,60 +51,94 @@ class Session:
                     "</appAuthorization>")
         r=requests.post(self._refreshtokenurl, headers=self._httpheaders, data=refreshtokenxml)
         self._refreshtoken=r.headers['location']
-        self._refresh_session()
+        #self._refresh_session()
         return self._refreshtoken
 
-    def get(self, relative_url):
-        if()
-        return requests.get(self._main_url+relative_url, headers=self._httpheaders).content
+    def get(self, url):
+        if not self._accesstoken_expdate or self._accesstoken_expdate < datetime.datetime.now(datetime.timezone.utc):
+            print('Requesting new access token...')
+            self._refresh_session()
+        print('Retrieving content from '+self._main_url+url)
+        return requests.get(self._main_url+url, headers=self._httpheaders).content
 
 
 _session=None
 
-class User:
+class Resource:
+    def __init__(self,url):
+        self._url=url
+        self._hasdata=False
+
+    def _refresh(self):
+        if not _session:
+            pass
+        return ET.fromstring(session.get(self._url))
+
+    def _initialize(self):
+        if not self._hasdata:
+            self._refresh()
+            self._hasdata=True
+
+
+
+class WorkspaceCollection(Resource):
     def __init__(self):
+        super().__init__('/workspaces/contents')
+        self._workspaces=[]
+
+    def _refresh(self):
+        xml=super()._refresh()
+        items=xml.findall('./collection')
+        for i in items:
+            w= {'displayName': i.find('displayName').text,
+                'ref': i.find('ref').text,
+                'contents': i.find('contents').text}
+            self._workspaces.append(w)
+
+    @property
+    def workspaces(self):
+        self._initialize()
+        return self._workspaces
+
+
+class User(Resource):
+    def __init__(self):
+        super().__init__('')
         self._nickname = None
         self._username = None
         self._quota = 0
         self._usage = 0
 
     def _refresh(self):
-        if _session is None:
-            pass
-        global xml
-        xml = ET.fromstring(session.get(''))
+        xml=super()._refresh()
         self._nickname = xml.findall('./nickname')[0].text
         self._username = xml.findall('./username')[0].text
         self._quota = int(xml.findall('./quota/limit')[0].text)
         self._usage = int(xml.findall('./quota/usage')[0].text)
 
-    def initialize(self):
-        if not self._nickname:
-            self._refresh()
-
     @property
     def nickname(self):
-        self.initialize()
+        self._initialize()
         return self._nickname
 
     @property
     def username(self):
-        self.initialize()
+        self._initialize()
         return self._username
 
     @property
     def quota(self):
-        self.initialize()
+        self._initialize()
         return self._quota
 
     @property
     def usage(self):
-        self.initialize()
+        self._initialize()
         return self.usage
 
     @property
     def usage_percent(self):
-        self.initialize()
+        self._initialize()
         return self._usage/self._quota*100
 
 
@@ -115,6 +150,7 @@ class SugarSync:
         self.accesskeyid=accesskeyid
         self.prvaccesskey=prvaccesskey
         self.user=User()
+        self.workspace_collection=WorkspaceCollection()
 
 
     def login(self,login,password):

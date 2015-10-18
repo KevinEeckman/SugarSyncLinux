@@ -84,6 +84,7 @@ def main():
     )
 
     s.login(_config['Login'], _config['Password'])
+    s.workspace_collection.workspaces
 
 
 
