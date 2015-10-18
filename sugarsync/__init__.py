@@ -1,57 +1,57 @@
-__author__ = 'kevin'
 import requests
 import xml.etree.ElementTree as ET
 import datetime
 import dateutil.parser
 
+__author__ = 'kevin'
+
 
 class Workspace:
     pass
 
+
 class Session:
     def __init__(self, appname, version, appid, accesskeyid, prvaccesskey):
-        self.appname=appname
-        self.version=version
-        self.appid=appid
-        self.accesskeyid=accesskeyid
-        self.prvaccesskey=prvaccesskey
-        self._refreshtokenurl='https://api.sugarsync.com/app-authorization'
-        self._accesstokenurl='https://api.sugarsync.com/authorization'
-        self._refreshtoken=None
-        self._httpheaders = { 'user-agent': appname+'/'+version }
+        self.appname = appname
+        self.version = version
+        self.appid = appid
+        self.accesskeyid = accesskeyid
+        self.prvaccesskey = prvaccesskey
+        self._refreshtokenurl = 'https://api.sugarsync.com/app-authorization'
+        self._accesstokenurl = 'https://api.sugarsync.com/authorization'
+        self._refreshtoken = None
+        self._httpheaders = {'user-agent': appname+'/'+version}
         self._accesstoken = None
-        self._main_url= None
-        self._accesstoken_expdate=None
+        self._main_url = None
+        self._accesstoken_expdate = None
 
     def _refresh_session(self):
         if 'Authorization' in self._httpheaders:
             del self._httpheaders['Authorization']
-        accesstokenxml = ( "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
-                        "<tokenAuthRequest>"
-                        "<accessKeyId>"+self.accesskeyid+"</accessKeyId>"
-                        "<privateAccessKey>"+self.prvaccesskey+"</privateAccessKey>"
-                        "<refreshToken>"+self._refreshtoken+"</refreshToken>"
-                        "</tokenAuthRequest>")
-        r=requests.post(self._accesstokenurl, headers=self._httpheaders, data=accesstokenxml)
-        self._httpheaders['Authorization']=r.headers['location']
-        xml=ET.fromstring(r.content)
-        self._accesstoken=r.headers['location']
-        self._main_url=xml.find('user').text
-        self._accesstoken_expdate=dateutil.parser.parse(xml.find('expiration').text)
+        accesstokenxml = ("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+                          "<tokenAuthRequest>"
+                          "<accessKeyId>"+self.accesskeyid+"</accessKeyId>"
+                          "<privateAccessKey>"+self.prvaccesskey+"</privateAccessKey>"
+                          "<refreshToken>"+self._refreshtoken+"</refreshToken>"
+                          "</tokenAuthRequest>")
+        r = requests.post(self._accesstokenurl, headers=self._httpheaders, data=accesstokenxml)
+        self._httpheaders['Authorization'] = r.headers['location']
+        xml = ET.fromstring(r.content)
+        self._accesstoken = r.headers['location']
+        self._main_url = xml.find('user').text
+        self._accesstoken_expdate = dateutil.parser.parse(xml.find('expiration').text)
 
-
-    def login(self,login,password):
+    def login(self, login, password):
         refreshtokenxml = ("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
-                    "<appAuthorization>"
-                    "<username>"+login+"</username>"
-                    "<password>"+password+"</password>"
-                    "<application>"+self.appid+"</application>"
-                    "<accessKeyId>"+self.accesskeyid+"</accessKeyId>"
-                    "<privateAccessKey>"+self.prvaccesskey+"</privateAccessKey>"
-                    "</appAuthorization>")
-        r=requests.post(self._refreshtokenurl, headers=self._httpheaders, data=refreshtokenxml)
-        self._refreshtoken=r.headers['location']
-        #self._refresh_session()
+                           "<appAuthorization>"
+                           "<username>"+login+"</username>"
+                           "<password>"+password+"</password>"
+                           "<application>"+self.appid+"</application>"
+                           "<accessKeyId>"+self.accesskeyid+"</accessKeyId>"
+                           "<privateAccessKey>"+self.prvaccesskey+"</privateAccessKey>"
+                           "</appAuthorization>")
+        r = requests.post(self._refreshtokenurl, headers=self._httpheaders, data=refreshtokenxml)
+        self._refreshtoken = r.headers['location']
         return self._refreshtoken
 
     def get(self, url):
@@ -62,12 +62,13 @@ class Session:
         return requests.get(self._main_url+url, headers=self._httpheaders).content
 
 
-_session=None
+_session = None
+
 
 class Resource:
-    def __init__(self,url):
-        self._url=url
-        self._hasdata=False
+    def __init__(self, url):
+        self._url = url
+        self._hasdata = False
 
     def _refresh(self):
         if not _session:
@@ -77,28 +78,50 @@ class Resource:
     def _initialize(self):
         if not self._hasdata:
             self._refresh()
-            self._hasdata=True
+            self._hasdata = True
 
 
-
-class WorkspaceCollection(Resource):
-    def __init__(self):
-        super().__init__('/workspaces/contents')
-        self._workspaces=[]
+class CollectionResource(Resource):
+    def __init__(self, url):
+        super().__init__(url)
+        self._contents = []
+        self._type = None
 
     def _refresh(self):
-        xml=super()._refresh()
-        items=xml.findall('./collection')
+        xml = super()._refresh()
+        items = xml.findall('./collection')
         for i in items:
-            w= {'displayName': i.find('displayName').text,
-                'ref': i.find('ref').text,
-                'contents': i.find('contents').text}
-            self._workspaces.append(w)
+            if not self._type:
+                self._type = i.attrib['type']
+            w = {'displayName': i.find('displayName').text,
+                 'ref': i.find('ref').text,
+                 'contents': i.find('contents').text}
+            self._contents.append(w)
 
     @property
-    def workspaces(self):
+    def type(self):
         self._initialize()
-        return self._workspaces
+        return self._type
+
+    @property
+    def contents(self):
+        self._initialize()
+        return self._contents
+
+    def show(self):
+        print('Collection: '+self.type)
+        for i in self.contents:
+            print("\t"+i['displayName'])
+
+
+class WorkspaceCollection(CollectionResource):
+    def __init__(self):
+        super().__init__('/workspaces/contents')
+
+
+class SyncFolderCollection(CollectionResource):
+    def __init__(self):
+        super().__init__('/folders/contents')
 
 
 class User(Resource):
@@ -110,7 +133,7 @@ class User(Resource):
         self._usage = 0
 
     def _refresh(self):
-        xml=super()._refresh()
+        xml = super()._refresh()
         self._nickname = xml.findall('./nickname')[0].text
         self._username = xml.findall('./username')[0].text
         self._quota = int(xml.findall('./quota/limit')[0].text)
@@ -134,7 +157,7 @@ class User(Resource):
     @property
     def usage(self):
         self._initialize()
-        return self.usage
+        return self._usage
 
     @property
     def usage_percent(self):
@@ -144,16 +167,16 @@ class User(Resource):
 
 class SugarSync:
     def __init__(self, appname, version, appid, accesskeyid, prvaccesskey):
-        self.appname=appname
-        self.version=version
-        self.appid=appid
-        self.accesskeyid=accesskeyid
-        self.prvaccesskey=prvaccesskey
-        self.user=User()
-        self.workspace_collection=WorkspaceCollection()
+        self.appname = appname
+        self.version = version
+        self.appid = appid
+        self.accesskeyid = accesskeyid
+        self.prvaccesskey = prvaccesskey
+        self.user = User()
+        self.workspace_collection = WorkspaceCollection()
+        self.syncfolders = SyncFolderCollection()
 
-
-    def login(self,login,password):
+    def login(self, login, password):
         global session
         session = Session(self.appname, self.version, self.appid, self.accesskeyid, self.prvaccesskey)
         return session.login(login, password)
