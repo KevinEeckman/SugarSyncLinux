@@ -3,6 +3,7 @@ import tkinter
 import requests
 import xml.etree.ElementTree as ET
 import dateutil.parser
+import sugarsync
 
 
 _config = {
@@ -70,9 +71,20 @@ def getuserinfo():
 
 def main():
     print("Welcome to SugarSync Linux")
-    global refresh, access
-    refresh=getrefreshtoken()
-    access=getaccesstoken()
+    global s
+    #refresh=getrefreshtoken()
+    #access=getaccesstoken()
+
+    s = sugarsync.SugarSync(
+        _config['ApplicationName'],
+        _config['Version'],
+        _config['ApplicationID'],
+        _config['AccessKeyID'],
+        _config['PrivateAccessKey']
+    )
+
+    s.login(_config['Login'], _config['Password'])
+
 
 
 if __name__== "__main__":
