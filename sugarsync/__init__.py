@@ -54,12 +54,18 @@ class Session:
         self._refreshtoken = r.headers['location']
         return self._refreshtoken
 
+    def _build_url(self, main_url, url):
+        if url.startswith('http'):
+            return url
+        return main_url+url
+
     def get(self, url):
         if not self._accesstoken_expdate or self._accesstoken_expdate < datetime.datetime.now(datetime.timezone.utc):
             print('Requesting new access token...')
             self._refresh_session()
-        print('Retrieving content from '+self._main_url+url)
-        return requests.get(self._main_url+url, headers=self._httpheaders).content
+        u=self._build_url(self._main_url, url)
+        print('Retrieving content from '+u)
+        return requests.get(u, headers=self._httpheaders).content
 
 
 _session = None
@@ -82,21 +88,25 @@ class Resource:
 
 
 class CollectionResource(Resource):
-    def __init__(self, url):
+    def __init__(self, url, type=None):
         super().__init__(url)
         self._contents = []
-        self._type = None
+        self._type = type
 
     def _refresh(self):
         xml = super()._refresh()
         items = xml.findall('./collection')
         for i in items:
-            if not self._type:
-                self._type = i.attrib['type']
-            w = {'displayName': i.find('displayName').text,
+            w = {'type': i.attrib['type'],
+                 'displayName': i.find('displayName').text,
                  'ref': i.find('ref').text,
                  'contents': i.find('contents').text}
-            self._contents.append(w)
+            obj=None
+            if (w['type'] == 'syncFolder') or (w['type'] == 'folder'):
+                obj=Folder(w['displayName'], w['ref'], w['contents'], w['type'])
+            else:
+                obj=w
+            self._contents.append(obj)
 
     @property
     def type(self):
@@ -111,17 +121,47 @@ class CollectionResource(Resource):
     def show(self):
         print('Collection: '+self.type)
         for i in self.contents:
-            print("\t"+i['displayName'])
+            s = getattr(i,'show', None)
+            if callable(s):
+                print('\t' + s())
+            else:
+                print('\t' + i['displayName'])
 
 
 class WorkspaceCollection(CollectionResource):
     def __init__(self):
-        super().__init__('/workspaces/contents')
+        super().__init__('/workspaces/contents', 'WorkspaceCollection')
 
 
 class SyncFolderCollection(CollectionResource):
     def __init__(self):
-        super().__init__('/folders/contents')
+        super().__init__('/folders/contents', 'SyncFolderCollection')
+
+
+class Folder(Resource):
+    def __init__(self, name, ref, contents, type):
+        super().__init__(ref)
+        self.name = name
+        self.type=type
+        self._collection = CollectionResource(contents, type)
+        self._time_created=None
+
+    def _refresh(self):
+        xml = super()._refresh()
+        self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
+
+    @property
+    def time_created(self):
+        self._initialize()
+        return self._time_created
+
+    @property
+    def contents(self):
+        self._collection._initialize()
+        return self._collection.contents
+
+    def show(self):
+        print(self.type + '\t\t' + self.name)
 
 
 class User(Resource):
