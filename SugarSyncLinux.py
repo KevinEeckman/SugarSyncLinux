@@ -84,8 +84,9 @@ def main():
     )
 
     s.login(_config['Login'], _config['Password'])
-    s.workspace_collection.contents
-
+    #s.syncfolders.contents
+    #print(s.syncfolders.items[1].contents.show())
+    s.syncfolders.items[1].recurse_print()
 
 
 if __name__== "__main__":

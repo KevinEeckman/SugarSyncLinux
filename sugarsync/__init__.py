@@ -72,14 +72,14 @@ _session = None
 
 
 class Resource:
-    def __init__(self, url):
-        self._url = url
+    def __init__(self, uri):
+        self._uri = uri
         self._hasdata = False
 
     def _refresh(self):
         if not _session:
             pass
-        return ET.fromstring(session.get(self._url))
+        return ET.fromstring(session.get(self._uri))
 
     def _initialize(self):
         if not self._hasdata:
@@ -88,67 +88,66 @@ class Resource:
 
 
 class CollectionResource(Resource):
-    def __init__(self, url, type=None):
-        super().__init__(url)
-        self._contents = []
-        self._type = type
+    def __init__(self, uri):
+        super().__init__(uri)
+        self._items = []
 
     def _refresh(self):
         xml = super()._refresh()
-        items = xml.findall('./collection')
-        for i in items:
-            w = {'type': i.attrib['type'],
-                 'displayName': i.find('displayName').text,
-                 'ref': i.find('ref').text,
-                 'contents': i.find('contents').text}
-            obj=None
-            if (w['type'] == 'syncFolder') or (w['type'] == 'folder'):
-                obj=Folder(w['displayName'], w['ref'], w['contents'], w['type'])
-            else:
-                obj=w
-            self._contents.append(obj)
+        for i in xml.iter('collection'):
+            self._items.append(Folder(i.find('ref').text, self))
+        for i in xml.iter('file'):
+            self._items.append(File(i.find('ref').text, self))
 
     @property
-    def type(self):
+    def items(self):
         self._initialize()
-        return self._type
+        return self._items
 
-    @property
-    def contents(self):
+    def __getitem__(self, index):
         self._initialize()
-        return self._contents
+        return self._items[index]
+
+    def __iter__(self):
+        self._initialize()
+        return iter(self._items)
+
+    def __next__(self):
+        self._initialize()
+        return next(self._items)
 
     def show(self):
-        print('Collection: '+self.type)
-        for i in self.contents:
+        ret = 'Collection:\n'
+        for i in self.items:
             s = getattr(i,'show', None)
             if callable(s):
-                print('\t' + s())
+                ret = ret + '\t' + i.show()
             else:
-                print('\t' + i['displayName'])
+                ret = ret + '\tFile\t' + i['displayName'] + '\n'
+        return ret
 
 
-class WorkspaceCollection(CollectionResource):
-    def __init__(self):
-        super().__init__('/workspaces/contents', 'WorkspaceCollection')
-
-
-class SyncFolderCollection(CollectionResource):
-    def __init__(self):
-        super().__init__('/folders/contents', 'SyncFolderCollection')
 
 
 class Folder(Resource):
-    def __init__(self, name, ref, contents, type):
-        super().__init__(ref)
-        self.name = name
-        self.type=type
-        self._collection = CollectionResource(contents, type)
+    def __init__(self, uri, parent = None):
+        super().__init__(uri)
+        self.parent = parent
+        self._name = None
         self._time_created=None
+        self._contents = None
+        #self._collection = None
 
     def _refresh(self):
         xml = super()._refresh()
+        self._name = xml.find('displayName').text
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
+        self._contents = CollectionResource(xml.find('contents').text)
+
+    @property
+    def name(self):
+        self._initialize()
+        return self._name
 
     @property
     def time_created(self):
@@ -157,12 +156,60 @@ class Folder(Resource):
 
     @property
     def contents(self):
-        self._collection._initialize()
-        return self._collection.contents
+        self._initialize()
+        return self._contents
 
     def show(self):
-        print(self.type + '\t\t' + self.name)
+        return '\tFolder\t' + self.name +'\n'
 
+    def recurse_print(self, prefix='/'):
+        new_prefix = prefix + self.name + '/'
+        print(new_prefix)
+        for i in self.contents:
+            i.recurse_print(new_prefix)
+
+
+class File(Resource):
+    def __init__(self, uri, parent):
+        super().__init__(uri)
+        self.parent = parent
+        self._name = None
+        self._time_created = None
+        self._last_modified = None
+        self._size = None
+
+    def _refresh(self):
+        xml = super()._refresh()
+        self._name = xml.find('displayName').text
+        self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
+        self._last_modified = dateutil.parser.parse(xml.find('lastModified').text)
+        self._size = int(xml.find('size').text)
+
+    @property
+    def name(self):
+        self._initialize()
+        return self._name
+
+    @property
+    def time_created(self):
+        self._initialize()
+        return self._time_created
+
+    @property
+    def last_modified(self):
+        self._initialize()
+        return self._last_modified
+
+    @property
+    def size(self):
+        self._initialize()
+        return self._size
+
+    def show(self):
+        return '\tFile\t' + self.name +'\t' + str(self.size) + '\n'
+
+    def recurse_print(self, prefix = ''):
+        print(prefix + self.name)
 
 class User(Resource):
     def __init__(self):
@@ -213,8 +260,8 @@ class SugarSync:
         self.accesskeyid = accesskeyid
         self.prvaccesskey = prvaccesskey
         self.user = User()
-        self.workspace_collection = WorkspaceCollection()
-        self.syncfolders = SyncFolderCollection()
+        self.workspaces = CollectionResource('/workspaces/contents')
+        self.syncfolders = CollectionResource('/folders/contents')
 
     def login(self, login, password):
         global session
