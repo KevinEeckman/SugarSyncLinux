@@ -86,6 +86,7 @@ def main():
 
     window = gui.Window() # Implicitly creates tk.Tk object
     window.master.title("Hello")
+    window.init_tree(s.syncfolders)
     window.master.mainloop()
 
 if __name__== "__main__":
