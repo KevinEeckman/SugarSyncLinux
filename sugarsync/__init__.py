@@ -72,14 +72,18 @@ _session = None
 
 
 class Resource:
+
+    resources = {}
+
     def __init__(self, uri):
-        self._uri = uri
+        self.uri = uri
         self._hasdata = False
+        Resource.resources[uri]=self
 
     def _refresh(self):
         if not _session:
             pass
-        return ET.fromstring(session.get(self._uri))
+        return ET.fromstring(session.get(self.uri))
 
     def _initialize(self):
         if not self._hasdata:
@@ -88,8 +92,9 @@ class Resource:
 
 
 class CollectionResource(Resource):
-    def __init__(self, uri):
+    def __init__(self, uri, parent=None):
         super().__init__(uri)
+        self.parent=parent
         self._items = []
 
     def _refresh(self):
@@ -142,7 +147,7 @@ class Folder(Resource):
         xml = super()._refresh()
         self._name = xml.find('displayName').text
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
-        self._contents = CollectionResource(xml.find('contents').text)
+        self._contents = CollectionResource(xml.find('contents').text, self.parent)
 
     @property
     def name(self):
