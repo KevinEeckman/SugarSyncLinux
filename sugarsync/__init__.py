@@ -100,9 +100,13 @@ class CollectionResource(Resource):
     def _refresh(self):
         xml = super()._refresh()
         for i in xml.iter('collection'):
-            self._items.append(Folder(i.find('ref').text, self))
+            self._items.append(Folder(i.find('ref').text, i.find('displayName').text, self))
         for i in xml.iter('file'):
-            self._items.append(File(i.find('ref').text, self))
+            self._items.append(File(i.find('ref').text,
+                                    i.find('displayName').text,
+                                    i.find('size').text,
+                                    i.find('lastModified').text,
+                                    self))
 
     @property
     def items(self):
@@ -135,24 +139,17 @@ class CollectionResource(Resource):
 
 
 class Folder(Resource):
-    def __init__(self, uri, parent = None):
+    def __init__(self, uri, name, parent = None):
         super().__init__(uri)
         self.parent = parent
-        self._name = None
+        self.name = name
         self._time_created=None
         self._contents = None
-        #self._collection = None
 
     def _refresh(self):
         xml = super()._refresh()
-        self._name = xml.find('displayName').text
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
         self._contents = CollectionResource(xml.find('contents').text, self.parent)
-
-    @property
-    def name(self):
-        self._initialize()
-        return self._name
 
     @property
     def time_created(self):
@@ -175,40 +172,25 @@ class Folder(Resource):
 
 
 class File(Resource):
-    def __init__(self, uri, parent):
+    def __init__(self, uri, name, size, last_modified, parent):
         super().__init__(uri)
         self.parent = parent
-        self._name = None
+        self.size=size
+        self.last_modified=last_modified
+        self.name = name
         self._time_created = None
-        self._last_modified = None
         self._size = None
 
     def _refresh(self):
         xml = super()._refresh()
-        self._name = xml.find('displayName').text
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
         self._last_modified = dateutil.parser.parse(xml.find('lastModified').text)
         self._size = int(xml.find('size').text)
 
     @property
-    def name(self):
-        self._initialize()
-        return self._name
-
-    @property
     def time_created(self):
         self._initialize()
         return self._time_created
-
-    @property
-    def last_modified(self):
-        self._initialize()
-        return self._last_modified
-
-    @property
-    def size(self):
-        self._initialize()
-        return self._size
 
     def show(self):
         return '\tFile\t' + self.name +'\t' + str(self.size) + '\n'
