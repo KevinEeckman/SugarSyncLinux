@@ -30,9 +30,9 @@ def main():
     parser.add_argument("-p", "--password", help="your SugarSync password")
     args = parser.parse_args()
 
-    if (args.login and args.password):
+    if args.login and args.password:
 
-        s.login(_config['Login'], _config['Password'])
+        s.login(args.login , args.password)
         #s.syncfolders.contents
         #print(s.syncfolders.items[1].contents.show())
         #s.syncfolders.items[1].recurse_print()
