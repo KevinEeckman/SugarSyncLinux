@@ -1,0 +1,14 @@
+Unofficial SugarSync Linux client
+
+*Learning Python by developing a linux client for SugarSync*
+
+There is no official linux client for SugarSync; this has been much debated already (see their wikipedia page at https://en.wikipedia.org/wiki/SugarSync).
+
+But they provide an API (https://www.sugarsync.com/developer) which allows 3rd party apps to connect to their cloud. While this is not the same API as the one they use for their official apps, this may prove to be good enough.
+
+Current status:
+The application doesn't do much : it connects to your cloud and allows you to browse the files there. You can't download them yet. That's it.
+
+Installation instructions:
+This runs on Python 3.4
+Download it, run SugarSyncLinux.py, and follow instructions.
