@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import ttk
+from tkinter import filedialog
 import sugarsync
 
 
@@ -60,13 +61,19 @@ class MainWindow(ttk.Frame):
         self.tree.bind('<Double-1>', self.tree_item_clicked)
         self.tree.grid(column=0, row=1, sticky=(N, S, E, W))
 
+        self.s = ttk.Scrollbar(self, orient=VERTICAL, command=self.tree.yview)
+        self.s.grid(column=1, row=1, sticky=(N,S))
+        #self.tree.bind('yscrollcommand', self.s.set)
+        self.tree['yscrollcommand'] = self.s.set
+
         save_as_btn = ttk.Button(self, text="save as", command=self.save_as)
         save_as_btn.grid(column=0, row=2,)
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+
         self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
 
         for child in self.winfo_children(): child.grid_configure(padx=5, pady=5)
         self.root_node=None
@@ -76,7 +83,12 @@ class MainWindow(ttk.Frame):
             self.display_tree(self.root_node.parent)
 
     def save_as(self):
-        pass
+        uri = self.tree.focus()
+        node = sugarsync.Resource.resources[uri]
+        if isinstance(node, sugarsync.File):
+            filename = filedialog.asksaveasfilename()
+            print(filename)
+            node.download(filename)
 
     def tree_item_clicked(self, event):
         uri = self.tree.focus()

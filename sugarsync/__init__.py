@@ -67,6 +67,19 @@ class Session:
         print('Retrieving content from '+u)
         return requests.get(u, headers=self._httpheaders).content
 
+    def get_file_data(self, url, local_filename):
+        if not self._accesstoken_expdate or self._accesstoken_expdate < datetime.datetime.now(datetime.timezone.utc):
+            print('Requesting new access token...')
+            self._refresh_session()
+        u=self._build_url(self._main_url, url)
+
+        print('Retrieving raw file data from '+u)
+        r = requests.get(u, headers=self._httpheaders, stream=True)
+        with open(local_filename, 'wb') as fd:
+            for chunk in r.iter_content(1024):
+                fd.write(chunk)
+        print('done')
+
 
 _session = None
 
@@ -136,8 +149,6 @@ class CollectionResource(Resource):
         return ret
 
 
-
-
 class Folder(Resource):
     def __init__(self, uri, name, parent = None):
         super().__init__(uri)
@@ -191,6 +202,9 @@ class File(Resource):
     def time_created(self):
         self._initialize()
         return self._time_created
+
+    def download(self, filename):
+        session.get_file_data(self.uri+'/data', filename)
 
     def show(self):
         return '\tFile\t' + self.name +'\t' + str(self.size) + '\n'
