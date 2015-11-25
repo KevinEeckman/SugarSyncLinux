@@ -67,6 +67,15 @@ class Session:
         print('Retrieving content from '+u)
         return requests.get(u, headers=self._httpheaders).content
 
+    def post(self, url, xml):
+        if not self._accesstoken_expdate or self._accesstoken_expdate < datetime.datetime.now(datetime.timezone.utc):
+            print('Requesting new access token...')
+            self._refresh_session()
+        u=self._build_url(self._main_url, url)
+        print('Posting content to '+u)
+        return requests.post(u, headers=self._httpheaders, data=xml)
+
+
     def get_file_data(self, url, local_filename):
         if not self._accesstoken_expdate or self._accesstoken_expdate < datetime.datetime.now(datetime.timezone.utc):
             print('Requesting new access token...')
@@ -96,7 +105,7 @@ class Resource:
     def _refresh(self):
         if not _session:
             pass
-        return ET.fromstring(session.get(self.uri))
+        return ET.fromstring(_session.get(self.uri))
 
     def _initialize(self):
         if not self._hasdata:
@@ -105,21 +114,25 @@ class Resource:
 
 
 class CollectionResource(Resource):
-    def __init__(self, uri, parent=None):
+    def __init__(self, uri, containingFolder=None, parentCollection=None):
         super().__init__(uri)
-        self.parent=parent
+        self.containingFolder = containingFolder
+        self.parentCollection = parentCollection
         self._items = []
 
     def _refresh(self):
         xml = super()._refresh()
         for i in xml.iter('collection'):
-            self._items.append(Folder(i.find('ref').text, i.find('displayName').text, self))
+            self._items.append(Folder(i.find('ref').text, i.find('displayName').text, self.containingFolder))
         for i in xml.iter('file'):
             self._items.append(File(i.find('ref').text,
                                     i.find('displayName').text,
                                     i.find('size').text,
                                     i.find('lastModified').text,
                                     self))
+
+    def add_folder(self, ref, displayName):
+        pass
 
     @property
     def items(self):
@@ -137,6 +150,8 @@ class CollectionResource(Resource):
     def __next__(self):
         self._initialize()
         return next(self._items)
+
+
 
     def show(self):
         ret = 'Collection:\n'
@@ -160,7 +175,7 @@ class Folder(Resource):
     def _refresh(self):
         xml = super()._refresh()
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
-        self._contents = CollectionResource(xml.find('contents').text, self.parent)
+        self._contents = CollectionResource(xml.find('contents').text, self, self.contents)
 
     @property
     def time_created(self):
@@ -171,6 +186,21 @@ class Folder(Resource):
     def contents(self):
         self._initialize()
         return self._contents
+
+    def create_folder(self, name):
+        #todo: check folder name for filesystem compliance
+        xml=("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+            "<folder>"
+            "<displayName>"+name+"</displayName>"
+            "</folder>")
+        self._initialize()
+        print('Creating folder '+name+'...')
+        r=_session.post(self.uri, xml)
+        if r.status_code >=300:
+            print('failed')
+        else:
+            self._contents.add_folder(r.headers['location'], name)
+
 
     def show(self):
         return '\tFolder\t' + self.name +'\n'
@@ -204,7 +234,7 @@ class File(Resource):
         return self._time_created
 
     def download(self, filename):
-        session.get_file_data(self.uri+'/data', filename)
+        _session.get_file_data(self.uri+'/data', filename)
 
     def show(self):
         return '\tFile\t' + self.name +'\t' + str(self.size) + '\n'
@@ -265,8 +295,8 @@ class SugarSync:
         self.syncfolders = CollectionResource('/folders/contents')
 
     def login(self, login, password):
-        global session
-        session = Session(self.appname, self.version, self.appid, self.accesskeyid, self.prvaccesskey)
-        return session.login(login, password)
+        global _session
+        _session = Session(self.appname, self.version, self.appid, self.accesskeyid, self.prvaccesskey)
+        return _session.login(login, password)
 
 

@@ -67,7 +67,10 @@ class MainWindow(ttk.Frame):
         self.tree['yscrollcommand'] = self.s.set
 
         save_as_btn = ttk.Button(self, text="save as", command=self.save_as)
-        save_as_btn.grid(column=0, row=2,)
+        save_as_btn.grid(column=0, row=2)
+
+        create_folder_btn = ttk.Button(self, text="new folder", command=self.create_folder)
+        create_folder_btn.grid(column=0, row=3)
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
@@ -76,11 +79,12 @@ class MainWindow(ttk.Frame):
         self.rowconfigure(1, weight=1)
 
         for child in self.winfo_children(): child.grid_configure(padx=5, pady=5)
+
         self.root_node=None
 
     def up(self):
-        if self.root_node and self.root_node.parent:
-            self.display_tree(self.root_node.parent)
+        if self.root_node and self.root_node.containingFolder:
+            self.display_tree(self.root_node.containingFolder.parent.contents)
 
     def save_as(self):
         uri = self.tree.focus()
@@ -89,6 +93,9 @@ class MainWindow(ttk.Frame):
             filename = filedialog.asksaveasfilename()
             print(filename)
             node.download(filename)
+
+    def create_folder(self):
+        self.root_node.containingFolder.create_folder("test")
 
     def tree_item_clicked(self, event):
         uri = self.tree.focus()

@@ -16,5 +16,9 @@ What's missing :
 - automatic folder synchronization management
 
 Installation instructions:
-This runs on Python 3.4 + Tkinter
+This runs on Python 3.4 + Tkinter.
+Requires "requests", a (quite common) python library. Install the package "python-requests" on Linux Mint.
 Download it, run SugarSyncLinux.py, and follow instructions.
+
+Other resources:
+Multi-cloud inc. SugarSync, CLI, for Linux, didn't try : https://github.com/joe42/CloudFusion
