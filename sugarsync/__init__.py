@@ -114,22 +114,23 @@ class Resource:
 
 
 class CollectionResource(Resource):
-    def __init__(self, uri, containingFolder=None, parentCollection=None):
+    def __init__(self, uri, containingFolder=None ):
         super().__init__(uri)
         self.containingFolder = containingFolder
-        self.parentCollection = parentCollection
         self._items = []
 
     def _refresh(self):
         xml = super()._refresh()
         for i in xml.iter('collection'):
-            self._items.append(Folder(i.find('ref').text, i.find('displayName').text, self.containingFolder))
+            self._items.append(Folder(i.find('ref').text,
+                                      i.find('displayName').text,
+                                      self.containingFolder))
         for i in xml.iter('file'):
             self._items.append(File(i.find('ref').text,
                                     i.find('displayName').text,
                                     i.find('size').text,
                                     i.find('lastModified').text,
-                                    self))
+                                    self.containingFolder))
 
     def add_folder(self, ref, displayName):
         pass
@@ -150,8 +151,6 @@ class CollectionResource(Resource):
     def __next__(self):
         self._initialize()
         return next(self._items)
-
-
 
     def show(self):
         ret = 'Collection:\n'
@@ -175,7 +174,7 @@ class Folder(Resource):
     def _refresh(self):
         xml = super()._refresh()
         self._time_created = dateutil.parser.parse(xml.find('timeCreated').text)
-        self._contents = CollectionResource(xml.find('contents').text, self, self.contents)
+        self._contents = CollectionResource(xml.find('contents').text, self)
 
     @property
     def time_created(self):
@@ -193,14 +192,13 @@ class Folder(Resource):
             "<folder>"
             "<displayName>"+name+"</displayName>"
             "</folder>")
-        self._initialize()
+        #self._initialize()
         print('Creating folder '+name+'...')
         r=_session.post(self.uri, xml)
         if r.status_code >=300:
             print('failed')
         else:
-            self._contents.add_folder(r.headers['location'], name)
-
+            self.contents.items.append(Folder(r.headers['location'], name, self))
 
     def show(self):
         return '\tFolder\t' + self.name +'\n'
@@ -282,9 +280,11 @@ class User(Resource):
         self._initialize()
         return self._usage/self._quota*100
 
+instance = None
 
 class SugarSync:
     def __init__(self, appname, version, appid, accesskeyid, prvaccesskey):
+        global instance
         self.appname = appname
         self.version = version
         self.appid = appid
@@ -293,6 +293,8 @@ class SugarSync:
         self.user = User()
         self.workspaces = CollectionResource('/workspaces/contents')
         self.syncfolders = CollectionResource('/folders/contents')
+        #self.syncfolders = WorkspaceCollection()
+        instance = self
 
     def login(self, login, password):
         global _session

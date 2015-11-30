@@ -55,22 +55,22 @@ class MainWindow(ttk.Frame):
         # self.columnconfigure(0, weight=1)
 
         up_btn = ttk.Button(self, text="up", command=self.up)
-        up_btn.grid(column=0, row=0,)
+        up_btn.grid(column=0, row=0, columnspan=2)
 
         self.tree = ttk.Treeview(self, columns='Type')
         self.tree.bind('<Double-1>', self.tree_item_clicked)
-        self.tree.grid(column=0, row=1, sticky=(N, S, E, W))
+        self.tree.grid(column=0, row=1, columnspan=2, sticky=(N, S, E, W))
 
-        self.s = ttk.Scrollbar(self, orient=VERTICAL, command=self.tree.yview)
-        self.s.grid(column=1, row=1, sticky=(N,S))
+        s = ttk.Scrollbar(self, orient=VERTICAL, command=self.tree.yview)
+        s.grid(column=2, row=1, sticky=(N,S))
         #self.tree.bind('yscrollcommand', self.s.set)
-        self.tree['yscrollcommand'] = self.s.set
+        self.tree['yscrollcommand'] = s.set
 
         save_as_btn = ttk.Button(self, text="save as", command=self.save_as)
-        save_as_btn.grid(column=0, row=2)
+        save_as_btn.grid(column=1, row=2, sticky=(E))
 
         create_folder_btn = ttk.Button(self, text="new folder", command=self.create_folder)
-        create_folder_btn.grid(column=0, row=3)
+        create_folder_btn.grid(column=0, row=2, sticky=(W))
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
@@ -83,8 +83,14 @@ class MainWindow(ttk.Frame):
         self.root_node=None
 
     def up(self):
-        if self.root_node and self.root_node.containingFolder:
+        #todo: handle the case where are the Syncfolder collection level (which has no containing folder)
+        if self.root_node.containingFolder.parent:
+            #we are in a normal Folder
             self.display_tree(self.root_node.containingFolder.parent.contents)
+        else:
+            #we are in a Syncfolder (which has no parent)
+            self.display_tree(sugarsync.instance.syncfolders)
+
 
     def save_as(self):
         uri = self.tree.focus()
